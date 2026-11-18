@@ -67,5 +67,75 @@ def get_tasks():
 
     return jsonify(task_list), 200
 
+
+# API to update an existing task
+@app.route("/tasks/<int:task_id>", methods=["PUT"])
+def update_task(task_id):
+
+    data = request.get_json()
+
+    connection = get_db_connection()
+
+    # Check whether the task exists
+    task = connection.execute(
+        "SELECT * FROM tasks WHERE id = ?",
+        (task_id,)
+    ).fetchone()
+
+    if task is None:
+        connection.close()
+        return jsonify({"error": "Task not found"}), 404
+
+    # Keep existing values if fields are not provided
+    title = data.get("title", task["title"])
+    description = data.get("description", task["description"])
+    due_date = data.get("due_date", task["due_date"])
+    priority = data.get("priority", task["priority"])
+    status = data.get("status", task["status"])
+
+    if not title:
+        connection.close()
+        return jsonify({"error": "Task title is required"}), 400
+
+    connection.execute(
+        """
+        UPDATE tasks
+        SET title = ?, description = ?, due_date = ?,
+            priority = ?, status = ?
+        WHERE id = ?
+        """,
+        (title, description, due_date, priority, status, task_id)
+    )
+
+    connection.commit()
+    connection.close()
+
+    return jsonify({
+        "message": "Task updated successfully!",
+        "task_id": task_id
+    }), 200
+# API to delete a task
+@app.route("/tasks/<int:task_id>", methods=["DELETE"])
+def delete_task(task_id):
+
+    connection = get_db_connection()
+
+    cursor = connection.execute(
+        "DELETE FROM tasks WHERE id = ?",
+        (task_id,)
+    )
+
+    connection.commit()
+    connection.close()
+
+    if cursor.rowcount == 0:
+        return jsonify({
+            "error": "Task not found!"
+        }), 404
+
+    return jsonify({
+        "message": "Task deleted successfully!",
+        "task_id": task_id
+    }), 200
 if __name__ == "__main__":
     app.run(debug=True)
